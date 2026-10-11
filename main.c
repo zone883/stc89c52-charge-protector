@@ -1,756 +1,244 @@
 #include <REGX52.H>
 
 #include "Delay.h"
-#include "Timer0.h"
-#include "Key.h"
-#include "Relay.h"
+#include "MatrixLED.h"
 #include "DS18B20.h"
 #include "INA219.h"
-#include "LCD1602.h"
-#include "MatrixLED.h"
-#include "LED.h"
+#include "Relay.h"
+#include "Key.h"
 
-/* ==========================================================================
- *                          ³ä µç ±£ »¤ Æ÷
- * ==========================================================================
- * »ùÓÚ 51 µ¥Æ¬»ú(STC89C52)µÄ³äµç±£»¤×°ÖÃ:
- * ÓÃ INA219 ÊµÊ±²âÁ¿³äµç»ØÂ·µÄµçÑ¹ / µçÁ÷, µçÁ÷Òì³£Ê±ÓÃ¼ÌµçÆ÷ÇĞ¶Ï³äµç»ØÂ·¡£
- *
- * ¹¦ÄÜ:
- *   1. ÊµÊ±²âÁ¿: INA219 ²â¸ºÔØµçÑ¹ / µçÁ÷, LCD ÏÔÊ¾ÒÑ³äµçÊ±¼ä
- *   2. ãĞÖµÉèÖÃ: ¶ÀÁ¢°´¼üµ÷Õû"³äÂúÅĞ¶¨µçÁ÷"ºÍ"¹ıÁ÷±£»¤µçÁ÷"Á½¸öãĞÖµ
- *   3. ¹ıÁ÷±£»¤: µçÁ÷³¬¹ıÉÏÏŞ³ÖĞø 1 Ãë -> ¼ÌµçÆ÷ÌøÕ¢¶Ïµç, ×ÔËø, Ğè°´ K4 ¸´Î»
- *               (Ïñ¼ÒÀïµÄ¿ÕÆø¿ª¹Ø)
- *   4. ³äÂúÅĞ¶¨: µçÁ÷µÍÓÚãĞÖµ³ÖĞø 5 Ãë -> ×Ô¶¯¶Ïµç
- *              (²»ÓÃ"µçÁ÷ == 0"ÅĞÂú, ÒòÎª³äµçÄ©ÆÚµçÁ÷Ö»Ë¥¼õµ½¼¸Ê®ºÁ°², µ½²»ÁË 0)
- *   5. ÎÂ¶È±£»¤: DS18B20 ¹ıÎÂ¶Ïµç + »Ø²î»Ö¸´¡£´úÂëÍêÕû±£Áô,
- *               Òò´«¸ĞÆ÷Ó²¼ş¹ÊÕÏ(Òı½ÅËÉ)ÔİÓÃ TEMP_SENSOR_EN = 0 ¹Ø±Õ
- *   6. ´«¸ĞÆ÷µôÏß×Ô¶¯¼ì²â + Ã¿ 2 ÃëÖØÊÔ³õÊ¼»¯
- *
- * Òı½Å·ÖÅä(Òª¸ÄÒı½ÅÖ»Ğè¸Ä¶ÔÓ¦Ä£¿éÎÄ¼ş¶¥²¿ÄÇÒ»ĞĞ):
- *   ¼ÌµçÆ÷          P1.0       (µÍµçÆ½´¥·¢, ¼û Relay.c)
- *   INA219 SDA/SCL  P1.2/P1.3  (¼û I2C.c)
- *   DS18B20 DQ      P3.7       (¼û OneWire.c)
- *   ¶ÀÁ¢°´¼ü K1~K4  P3.1/P3.0/P3.2/P3.3 (¿ª·¢°åË¿Ó¡Ë³Ğò, Ó³Éä±í¼û Key.c ¶¥²¿)
- *   °åÔØ 8 ¸ö LED   P2.0~P2.7(µÍµçÆ½µãÁÁ): ³äµçÖĞ°´µçÁ÷ÁÁÖù×´Ìõ,
- *                   ÒÑ³äÂúÈ«ÁÁ, ±£»¤¶¯×÷Ê±ÕûÅÅÉÁË¸ (¼û LED.c)
- *   LCD1602         RS=P2.6 RW=P2.5 EN=P2.7 D0~D7=P0
- *   µãÕó 74HC595    SER=P3.4 RCK=P3.5 SCK=P3.6 ÁĞ=P0
- *
- *   LCD ºÍµãÕó¹²ÓÃ P0 Êı¾İÏß, Êµ¼ÊÖ»ÄÜ½ÓÒ»¿é; ³ÌĞò¿ª»ú×Ô¶¯Ì½²â,
- *   ¶Áµ½ LCD Ó¦´ğ¾ÍÓÃ LCD, ·ñÔò×Ô¶¯ÇĞµ½µãÕóÏÔÊ¾×´Ì¬Í¼±ê, ²»»áÒ»Æ¬¿Õ°×¡£
- *
- * °´¼üËµÃ÷:
- *   K1 / K2   µ±Ç°Ñ¡ÖĞãĞÖµ +1 µµ / -1 µµ
- *   K3 ¶Ì°´   ·­Ò³(ÊµÊ± -> ãĞÖµ -> ×Ô¼ì)
- *   K3 ³¤°´   ÇĞ»»"ÕıÔÚµ÷³äÂúµçÁ÷"»¹ÊÇ"ÕıÔÚµ÷¹ıÁ÷±£»¤"
- *   K4 ¶Ì°´   ¸´Î»(Çå³äµç¼ÆÊ± / ½â³ıÌøÕ¢)
- *   °´×¡ÈÎÒâ¼ü -> °åÔØ LED ÁÁ¶ÔÓ¦¸ñÊı(K1=1¸ñ ... K4=4¸ñ), ËÉÊÖ±£³Ö 1 Ãë,
- *               ³¤°´±»Ê¶±ğÊ±Õâ¸ùÌõÉÁË¸ ¡ª¡ª ²»ÓÃÆÁÄ»Ò²ÄÜÈ·ÈÏ°´¼üÉúĞ§¡£
- *
- * ¿ª»ú×Ô¼ì:
- *   ¼ÌµçÆ÷ "ßÇßÕ" Á½ÏÂ -> LCD Ì½²â -> °åÔØ LED Á÷Ë®µÆ ->
- *   INA219 ÔÚÏß: ÁÁ 4 ¸ñÍ£Ò»ÏÂ; ²»ÔÚÏß: ÕûÅÅÉÁ 3 ´Î
- * µãÕóÍ¼±ê:  ¡Ì = Ò»ÇĞÕı³£    ! ÉÁ = INA219 µôÏß    ¡Á ÉÁ = ÕıÔÚ±£»¤/ÌøÕ¢
- *
- * ¡ï Ä¬ÈÏãĞÖµ:
- *     ³äÂúÅĞ¶¨ FULL = 20mA    ¹ıÁ÷±£»¤ OVER = 100mA
- *   Ê¹ÓÃÔ­Ôò:  FULL ãĞÖµ < Êµ¼Ê³äµçµçÁ÷ < OVER ãĞÖµ¡£
- *   Ò»ÉÏµç¾Í×Ô¶¯"³äÂú"¶Ïµç -> FULL ãĞÖµµ÷Ğ¡; Ò»ÉÏµç¾ÍÌøÕ¢ -> OVER ãĞÖµµ÷´ó¡£
- * ========================================================================== */
 
-/****************************************
- *              ¿ÉÉèÖÃ²ÎÊı
- ****************************************/
-/* DS18B20 Ó²¼ş¹ÊÕÏ(Òı½ÅËÉ, ½Ó´¥²»Á¼), ÔİÊ±¹Ø±ÕÕæÊµ²âÎÂ¡£
- * Ïà¹Ø´úÂëÈ«²¿±£Áô, ´«¸ĞÆ÷ĞŞºÃºó°ÑÕâĞĞ¸Ä³É 1 ¼´¿É»Ö¸´¡£ */
-#define TEMP_SENSOR_EN       0
 
-#define TEMP_LIMIT_DEFAULT   45       /* ÎÂ¶ÈÉÏÏŞ, µ¥Î» ¡æ */
-#define TEMP_LIMIT_MIN       20
-#define TEMP_LIMIT_MAX       80
-#define TEMP_HYST            2        /* ¹ıÎÂ»Ö¸´ÒªµÈÎÂ¶È½µ»Ø (ÉÏÏŞ-2)¶È */
+/************** å‚æ•° **************/
 
-#define CUT_MA_DEFAULT       20       /* ³äÂúÅĞ¶¨µçÁ÷, µ¥Î» mA
-                                       * Ò»¶¨Òª±ÈÊµ¼Ê³äµçµçÁ÷Ğ¡! ·ñÔòÒ»ÉÏµç¾Í»á
-                                       * "µçÁ÷ < ãĞÖµ" ¶øÎóÅĞ³äÂú¶Ïµç */
-#define CUT_MA_MIN           10
-#define CUT_MA_MAX           500
-#define CUT_MA_STEP          10
+unsigned char TemperatureLimit = 30;
 
-#define OC_MA_DEFAULT        100      /* ¹ıÁ÷±£»¤ãĞÖµ, µ¥Î» mA
-                                       * Òª±ÈÊµ¼Ê³äµçµçÁ÷´ó, ·ñÔòÒ»ÉÏµç¾ÍÌøÕ¢ */
-#define OC_MA_MIN            20
-#define OC_MA_MAX            500
-#define OC_MA_STEP           20       /* 20mA Ò»µµ, ´Ó 100 ½µµ½ 20 Ö»Ğè°´ 4 ÏÂ */
-#define OC_CONFIRM_CNT       5        /* ³¬Á÷³ÖĞø 5 * 200ms = 1 Ãë²ÅÌøÕ¢, ÂËµô²å°ÎË²¼ä¼â·å */
 
-#define V_ON_MV              3000     /* ×ÜÏßµçÑ¹¸ßÓÚ 3V ÈÏÎª½ÓÈëÁË¸ºÔØ */
-#define FULL_CONFIRM_SEC     5        /* µçÁ÷³ÖĞøµÍÓÚãĞÖµ 5 Ãë²ÅÅĞ¶¨³äÂú */
+/************** çŠ¶æ€å˜é‡ **************/
 
-/****************************************
- *              ÔËĞĞ×´Ì¬
- ****************************************/
-#define ST_IDLE       0               /* ¿ÕÔØ */
-#define ST_CHARGING   1               /* ÕıÔÚ³äµç */
-#define ST_FULL       2               /* ³äÂú, ÒÑ×Ô¶¯¶Ïµç */
-#define ST_OVERHEAT   3               /* ¹ıÎÂ±£»¤, ÒÑ¶Ïµç */
-#define ST_OCURRENT   4               /* ¹ıÁ÷ÌøÕ¢, ÒÑ¶Ïµç, Ğè°´ K4 ¸´Î» */
+float Temperature;
 
-/* ---- ¿ÉÉèÖÃ²ÎÊı ---- */
-unsigned char g_limit = TEMP_LIMIT_DEFAULT;    /* ÎÂ¶ÈÉÏÏŞ ¡æ */
-unsigned int  g_cut   = CUT_MA_DEFAULT;        /* ³äÂúÅĞ¶¨µçÁ÷ mA */
-unsigned int  g_oc    = OC_MA_DEFAULT;         /* ¹ıÁ÷±£»¤ãĞÖµ mA */
+int Current;
 
-/* ---- ´«¸ĞÆ÷Êı¾İ ---- */
-int  g_t_x10  = 0;                /* ÎÂ¶È, µ¥Î» 0.1¡æ */
-bit  g_t_ok   = 0;                /* ±¾´ÎÎÂ¶ÈÊı¾İÊÇ·ñ¿ÉÓÃ */
-bit  g_ina_ok = 0;                /* ±¾´ÎµçÁ÷µçÑ¹Êı¾İÊÇ·ñ¿ÉÓÃ */
-unsigned int g_mv = 0;            /* ×ÜÏßµçÑ¹ mV */
-int  g_ma = 0;                    /* µçÁ÷ mA */
+unsigned char KeyNum;
 
-/* ---- Ó²¼ş×Ô¼ì½á¹û ---- */
-bit  g_hw_t_ok   = 0;             /* DS18B20 ÊÇ·ñÔÚÏß */
-bit  g_hw_ina_ok = 0;             /* INA219 ÊÇ·ñÓ¦´ğ */
 
-/* ---- ÔËĞĞ×´Ì¬ ---- */
-unsigned char g_state    = ST_IDLE;
-unsigned int  g_sec      = 0;     /* ÒÑ³äµçÊ±¼ä(Ãë) */
-unsigned char g_full_cnt = 0;     /* µÍµçÁ÷³ÖĞø¼ÆÊı, µ¥Î» 200ms */
-unsigned char g_oc_cnt   = 0;     /* ¹ıµçÁ÷³ÖĞø¼ÆÊı, µ¥Î» 200ms */
-bit  g_charged = 0;               /* ±¾´Î³äµçÊÇ·ñÕæµÄ²âµ½¹ı³äµçµçÁ÷
-                                   * ·ÀÖ¹"¸ºÔØÃ»´®½ø²âÁ¿»ØÂ· / µçÁ÷¶ÁÊıºã 0"Ê±
-                                   * Ò»ÉÏµç¾ÍÎóÅĞ³É³äÂú */
+/************** ç‚¹é˜µå›¾æ¡ˆ **************/
 
-/* ---- ½çÃæ ---- */
-unsigned char g_page      = 0;    /* 0=ÊµÊ± 1=ãĞÖµ 2=×Ô¼ì */
-unsigned char g_page_hold = 0;    /* ÁÙÊ±Ò³Í£ÁôÊ±¼ä, µ¥Î» 500ms */
-unsigned char g_sel       = 0;    /* 0=µ÷³äÂúµçÁ÷ 1=µ÷¹ıÁ÷±£»¤ */
-unsigned char g_disp      = 0;    /* 0=LCD1602  1=µãÕó */
-unsigned char g_blink     = 0;    /* ÉÁË¸±êÖ¾, Ã¿ 250ms ·­×ª */
 
-/* ---- °´¼ü·´À¡Ìõ ----
- * °´×¡ÈÎÒâ¼ü -> °åÔØ LED ÁÁ¶ÔÓ¦¸ñÊı(K1=1¸ñ ... K4=4¸ñ), ËÉÊÖ±£³Ö 1 Ãë;
- * ³¤°´±»Ê¶±ğÊ±Õâ¸ùÌõÉÁË¸¡£²»ÓÃÆÁÄ»Ò²ÄÜÈ·ÈÏ°´¼üÉúĞ§¡£ */
-unsigned char g_kbar   = 0;       /* ÒªÏÔÊ¾µÄ¼üºÅ 1~4, 0 = Ã»ÔÚ°´¼ü */
-unsigned int  t_kbar   = 0;       /* ·´À¡¿ªÊ¼¼ÆÊ± */
-bit           g_kflash = 0;       /* ³¤°´ÒÑ±»Ê¶±ğ -> ·´À¡ÌõÉÁË¸ */
+// æ­£å¸¸ âˆš
 
-/****************************************
- *            µãÕóÏÔÊ¾Í¼°¸
- ****************************************/
-unsigned char code ICON_OK[8] =
+unsigned char code OK[8]=
 {
-    0x00, 0x01, 0x02, 0x04, 0x88, 0x50, 0x20, 0x00
+    0x00,
+    0x01,
+    0x02,
+    0x04,
+    0x88,
+    0x50,
+    0x20,
+    0x00
 };
 
-unsigned char code ICON_ERR[8] =
+
+// ä¿æŠ¤ Ã—
+
+unsigned char code ERROR[8]=
 {
-    0x81, 0x42, 0x24, 0x18, 0x18, 0x24, 0x42, 0x81
+    0x81,
+    0x42,
+    0x24,
+    0x18,
+    0x18,
+    0x24,
+    0x42,
+    0x81
 };
 
-unsigned char code ICON_WARN[8] =
-{
-    0x18, 0x18, 0x18, 0x18, 0x18, 0x00, 0x18, 0x00
-};
 
-/* ÎÂ¶È¹¦ÄÜÊÇ·ñËã"¹ÊÕÏ": ´«¸ĞÆ÷¹Ø±Õ(TEMP_SENSOR_EN=0)Ê±²»Ëã,
- * ·ñÔòµãÕó»áÒ»Ö±±¨"!", ·´¶ø¸Ç×¡ÁËÕæÕıµÄÎÊÌâ(INA219 µôÏß) */
-#if TEMP_SENSOR_EN
-  #define T_FAULT   (!g_hw_t_ok)
-#else
-  #define T_FAULT   (0)
-#endif
 
-/****************************************
- *         LCD Ò»ĞĞ»º³å(17 ×Ö½Ú)
- * ×éºÃÒ»ÕûĞĞÔÙÒ»´ÎĞÔĞ´³öÈ¥, Ê¡ RAM Ò²Ê¡Ê±¼ä
- ****************************************/
-static char idata buf[17];   /* ·Å idata: 128 ×Ö½ÚÖ±½ÓÑ°Ö· RAM ·Å²»ÏÂ, Å²µ½¸ß 128 ×Ö½Ú */
+unsigned char DisplayBuffer[8];
 
-/* ×·¼Ó×Ö·û´® */
-static unsigned char PutS(unsigned char pos, char code *s)
-{
-    unsigned char i = 0;
 
-    while((s[i] != '\0') && (pos < 16))
-    {
-        buf[pos] = s[i];
-        pos++;
-        i++;
-    }
-    return pos;
-}
 
-/* ×·¼Ó¶¨³¤Ê®½øÖÆÊı, ¸ßÎ»²»¹»¾ÍÓÃ pad ²¹(Í¨³£ÊÇ¿Õ¸ñ»ò '0') */
-static unsigned char PutN(unsigned char pos, unsigned int v, unsigned char len, char pad)
+/************** ç‚¹é˜µåˆ·æ–° **************/
+
+void Matrix_Set(unsigned char *Data)
 {
     unsigned char i;
-    unsigned int  p = 1;
 
-    for(i = 1; i < len; i++) p *= 10;
-
-    for(i = 0; i < len; i++)
+    for(i=0;i<8;i++)
     {
-        if((p > v) && (pad != '0')) buf[pos] = pad;
-        else                        buf[pos] = (char)(v / p % 10 + '0');
-        p /= 10;
-        pos++;
-    }
-    return pos;
-}
-
-/* ²¹Æëµ½ 16 ×Ö·û²¢Ğ´Ò»ÕûĞĞ */
-static void Show(unsigned char line, unsigned char pos)
-{
-    while(pos < 16) buf[pos++] = ' ';
-    buf[16] = '\0';
-
-    LCD_ShowString(line, 1, (char *)buf);
-}
-
-static char code *StateStr(void)
-{
-    switch(g_state)
-    {
-        case ST_CHARGING: return "CHRG";
-        case ST_FULL:     return "FULL";
-        case ST_OVERHEAT: return "HOT!";
-        case ST_OCURRENT: return "OC!!";
-    }
-    return "IDLE";
-}
-
-static void Page_Set(unsigned char p)
-{
-    g_page = p;
-    if(p == 0) g_page_hold = 0;          /* ÊµÊ±Ò³²»ĞèÒª×Ô¶¯·µ»Ø */
-    else       g_page_hold = 6;          /* 3 Ãëºó×Ô¶¯»Øµ½ÊµÊ±Ò³ */
-}
-
-/****************************************
- *            LCD Ò³ÃæÄÚÈİ
- ****************************************/
-static void Disp_Update(void)
-{
-    unsigned char p;
-
-    /* ================= µÚ 1 ĞĞ ================= */
-    if(g_page == 0)
-    {
-        p = 0;
-        p = PutS(p, "U:");
-        if(g_ina_ok)
-        {
-            p = PutN(p, g_mv / 1000, 1, ' ');
-            buf[p++] = '.';
-            p = PutN(p, (g_mv % 1000) / 100, 1, '0');
-            p = PutN(p, (g_mv % 100) / 10, 1, '0');
-        }
-        else
-        {
-            p = PutS(p, "-.--");
-        }
-        p = PutS(p, "V I:");
-        if(g_ina_ok) p = PutN(p, (unsigned int)(g_ma < 0 ? -g_ma : g_ma), 4, ' ');
-        else         p = PutS(p, "----");
-        p = PutS(p, "mA");
-
-        Show(1, p);
-    }
-    else if(g_page == 1)
-    {
-        p = 0;
-        p = PutS(p, g_sel ? " " : ">");      /* > ºÅ±ê³öÕıÔÚµ÷µÄÊÇÄÄÒ»¸ö */
-        p = PutS(p, "FULL");
-        p = PutN(p, g_cut, 4, ' ');
-        p = PutS(p, "mA");
-
-        Show(1, p);
-    }
-    else
-    {
-        p = 0;
-        p = PutS(p, "T-SENS:");
-#if TEMP_SENSOR_EN
-        p = PutS(p, g_hw_t_ok ? "OK" : "FAULT");
-#else
-        p = PutS(p, "OFF");      /* ´«¸ĞÆ÷Ó²¼ş¹ÊÕÏ, ¹¦ÄÜÒÑ¹Ø±Õ(´úÂë±£Áô) */
-#endif
-
-        Show(1, p);
-    }
-
-    /* ================= µÚ 2 ĞĞ ================= */
-    if(g_page == 0)
-    {
-        p = 0;
-        p = PutS(p, StateStr());
-        p = PutS(p, " ");
-        p = PutN(p, g_sec / 3600, 2, '0');
-        buf[p++] = ':';
-        p = PutN(p, g_sec / 60 % 60, 2, '0');
-        buf[p++] = ':';
-        p = PutN(p, g_sec % 60, 2, '0');
-
-        Show(2, p);
-    }
-    else if(g_page == 1)
-    {
-        p = 0;
-        p = PutS(p, g_sel ? ">" : " ");
-        p = PutS(p, "OVER");
-        p = PutN(p, g_oc, 4, ' ');
-        p = PutS(p, "mA");
-
-        Show(2, p);
-    }
-    else
-    {
-        p = 0;
-        p = PutS(p, "INA:");
-        p = PutS(p, g_hw_ina_ok ? "OK" : "NG");
-        p = PutS(p, "  RLY:");
-        p = PutS(p, Relay_GetState() ? "ON" : "OFF");
-
-        Show(2, p);
+        DisplayBuffer[i]=Data[i];
     }
 }
 
-/****************************************
- *           µãÕó×´Ì¬ÏÔÊ¾
- ****************************************/
-static void Disp_Matrix(void)
+
+
+void Matrix_Refresh(void)
 {
-    static unsigned char col = 0;
-    unsigned char v;
-    unsigned char icon;
+    static unsigned char Column=0;
 
-    /* ±£»¤¶¯×÷×îÓÅÏÈ, Æä´ÎÊÇ INA219 µôÏß(ÎÂ¶È¹¦ÄÜ¹Ø±Õ²»Ëã¹ÊÕÏ) */
-    if(g_state >= ST_OVERHEAT)                     icon = 1;
-    else if(T_FAULT || (!g_hw_ina_ok))             icon = 2;
-    else                                           icon = 0;
 
-    if(icon == 0)      v = ICON_OK[col];
-    else if(icon == 1) v = ICON_ERR[col];
-    else               v = ICON_WARN[col];
+    MatrixLED_ShowColumn(
+        Column,
+        DisplayBuffer[Column]
+    );
 
-    /* ¸æ¾¯Ê±ÕûÆÁÉÁË¸, Ò»ÑÛ¾ÍÄÜ¿´³öÀ´ */
-    if((icon != 0) && g_blink) v = 0x00;
 
-    MatrixLED_ShowColumn(col, v);
+    Column++;
 
-    col++;
-    if(col >= 8) col = 0;
+    if(Column>=8)
+    {
+        Column=0;
+    }
+
 }
 
-/****************************************
- *           ±£»¤¿ØÖÆÂß¼­
- *           (Ã¿ 200ms µ÷ÓÃÒ»´Î)
- ****************************************/
-static void Control_Update(void)
+
+
+
+
+/************** ä¸»å‡½æ•° **************/
+
+void main()
 {
-    bit over;
 
-    /* ---- 1. ¹ıÎÂÅĞ¶Ï: ÓÅÏÈ¼¶×î¸ß ---- */
-    over = 0;
-    if(g_t_ok && (g_t_x10 >= (int)g_limit * 10)) over = 1;
+    unsigned int Count=0;
 
-    if(over)
-    {
-        Relay_Set(0);
-        g_state    = ST_OVERHEAT;
-        g_full_cnt = 0;
-        return;
-    }
 
-    /* ---- 2. ¹ıÎÂ±£»¤ÒªµÈÎÂ¶È½µ»Ø (ÉÏÏŞ-2)¶È ²Å»Ö¸´, ·ÀÖ¹ÁÙ½ç¶¶¶¯ ---- */
-    if(g_state == ST_OVERHEAT)
-    {
-        if(g_t_ok && (g_t_x10 > ((int)g_limit - TEMP_HYST) * 10))
-        {
-            Relay_Set(0);
-            return;
-        }
-    }
+    /******** åˆå§‹åŒ– ********/
 
-    /* ---- 3. ¹ıÁ÷ÌøÕ¢ÊÇ×ÔËøµÄ: ±ØĞë°´ K4 ¸´Î»²ÅÄÜ»Ö¸´, ¾ÍÏñ¼ÒÀïµÄ¿ÕÆø¿ª¹Ø ---- */
-    if(g_state == ST_OCURRENT)
-    {
-        Relay_Set(0);
-        return;
-    }
 
-    /* ---- 4. ¹ıÁ÷¼ì²â: µçÁ÷³¬¹ıãĞÖµ³ÖĞø 1 Ãë -> ÌøÕ¢ ---- */
-    if(g_ina_ok && (g_ma > (int)g_oc))
-    {
-        if(g_oc_cnt < 250) g_oc_cnt++;
-        if(g_oc_cnt >= OC_CONFIRM_CNT)
-        {
-            Relay_Set(0);
-            g_state    = ST_OCURRENT;
-            g_full_cnt = 0;
-            return;
-        }
-    }
-    else
-    {
-        g_oc_cnt = 0;
-    }
+    MatrixLED_Init();
 
-    /* ---- 5. µçÁ÷/µçÑ¹ÅĞ¶Ï(INA219 Õı³£Ê±²ÅÓĞĞ§) ---- */
-    if(g_ina_ok)
-    {
-        if(g_mv < V_ON_MV)              /* Ã»½Ó¸ºÔØ, ¶Ï¿ª¸ü°²È« */
-        {
-            Relay_Set(0);
-            g_state    = ST_IDLE;
-            g_full_cnt = 0;
-            return;
-        }
 
-        if(g_ma >= (int)g_cut)          /* ²âµ½ÕæÊµµÄ³äµçµçÁ÷ -> ¼ÇÏÂÀ´ */
-        {
-            g_charged  = 1;
-            g_full_cnt = 0;
-        }
-        else if(g_charged)              /* µçÁ÷µøÏÂÀ´, ÇÒÕâ´ÎÈ·Êµ³ä¹ıµç */
-        {
-            if(g_full_cnt < 250) g_full_cnt++;
-            if(g_full_cnt >= (unsigned char)(FULL_CONFIRM_SEC * 5))
-            {
-                Relay_Set(0);
-                g_state = ST_FULL;
-                return;
-            }
-        }
-        else                            /* »¹Ã»²âµ½¹ı³äµçµçÁ÷: ²»ÄÜÅĞÂú
-                                         * (·ñÔòµçÁ÷¶ÁÊıºã 0 »áÒ»ÉÏµç¾ÍÎóÅĞ³äÂú) */
-        {
-            g_full_cnt = 0;
-        }
-    }
-
-    /* ---- 6. Ò»ÇĞÕı³£, ÔÊĞí³äµç ---- */
-    if((g_state != ST_CHARGING) && (g_state != ST_OVERHEAT))
-    {
-        g_sec = 0;                      /* ĞÂÒ»´Î³äµç, ¼ÆÊ±ÖØĞÂ¿ªÊ¼ */
-    }
-    Relay_Set(1);
-    g_state = ST_CHARGING;
-}
-
-/****************************************
- *             °´¼ü´¦Àí
- ****************************************/
-static void Reset_All(void)
-{
-    g_sec      = 0;
-    g_full_cnt = 0;
-    g_oc_cnt   = 0;
-    g_charged  = 0;
-    g_state    = ST_IDLE;
-    Page_Set(0);
-}
-
-static void Key_Handle(unsigned char ev)
-{
-    unsigned char n;
-
-    if(ev == 0) return;
-
-    n = (unsigned char)(ev & 0x0F);
-
-    switch(n)
-    {
-        case 1:
-        case 2:
-            if(ev & KEY_LONG_FLAG) break;
-
-            if(g_sel == 0)              /* µ÷³äÂúÅĞ¶¨µçÁ÷ */
-            {
-                if(n == 1)
-                {
-                    if(g_cut <= (CUT_MA_MAX - CUT_MA_STEP)) g_cut += CUT_MA_STEP;
-                }
-                else
-                {
-                    if(g_cut >= (CUT_MA_MIN + CUT_MA_STEP)) g_cut -= CUT_MA_STEP;
-                }
-            }
-            else                        /* µ÷¹ıÁ÷±£»¤ãĞÖµ */
-            {
-                if(n == 1)
-                {
-                    if(g_oc <= (OC_MA_MAX - OC_MA_STEP)) g_oc += OC_MA_STEP;
-                }
-                else
-                {
-                    if(g_oc >= (OC_MA_MIN + OC_MA_STEP)) g_oc -= OC_MA_STEP;
-                }
-            }
-
-            Page_Set(1);                /* µ÷²ÎÊıÊ±×Ô¶¯ÇĞµ½ÉèÖÃÒ³ */
-            break;
-
-        case 3:
-            if(ev & KEY_LONG_FLAG)      /* ³¤°´: ÇĞ»»ÕıÔÚµ÷ÄÄ¸ö²ÎÊı */
-            {
-                if(g_sel == 0) g_sel = 1;
-                else           g_sel = 0;
-                Page_Set(1);
-            }
-            else                        /* ¶Ì°´: ·­Ò³ */
-            {
-                Page_Set((unsigned char)((g_page + 1) % 3));
-            }
-            break;
-
-        case 4:
-            Reset_All();                /* ¶Ì°´/³¤°´¶¼ÊÇ¸´Î» */
-            break;
-
-        default: break;
-    }
-}
-
-/****************************************
- *              Ö÷º¯Êı
- ****************************************/
-void main(void)
-{
-    unsigned int now;
-    unsigned int t_key = 0, t_sensor = 0, t_ina = 0, t_ctrl = 0;
-    unsigned int t_disp = 0, t_sec = 0, t_blink = 0, t_reinit = 0, t_page = 0;
-
-    unsigned int v;
-    int i;
-    unsigned char ev;
-    unsigned char kd;
-
-    /* ---------- 1. »ù´¡³õÊ¼»¯ ---------- */
-    Relay_Init();
-    Timer0_Init();                      /* 1ms ĞÄÌø */
-
-    Relay_SelfTest();                   /* ¼ÌµçÆ÷×Ô¼ì: "ßÇßÕ"Á½ÏÂ */
-
-    /* ÏÈÎüºÏ¼ÌµçÆ÷ÔÙÌ½²âÏÔÊ¾ÆÁ: Èç¹û LCD µÄµçÊÇ¾­¹ı¼ÌµçÆ÷/INA219 ¹ıÀ´µÄ,
-     * ¶Ïµç×´Ì¬ÏÂËüÎŞ·¨Ó¦´ğ; LCD Ö»µ±ÏÔÊ¾Æ÷Ê±ÕâÒ»²½Ã»ÓĞÈÎºÎÓ°Ïì¡£ */
-    Relay_Set(1);
-
-    /* ---------- 2. ÏÔÊ¾ÆÁ×Ô¼ì: LCD ²»Ó¦´ğ¾Í×Ô¶¯¸ÄÓÃµãÕó ---------- */
-    LCD_Init();
-    if(LCD_Check())
-    {
-        g_disp = 0;
-    }
-    else
-    {
-        g_disp = 1;
-        MatrixLED_Init();
-    }
-
-    /* ---------- 2.5 °åÔØ LED ×Ô¼ì ----------
-     * ÌØÒâ·ÅÔÚÆÁÄ»Ì½²âÖ®ºó: LED Óë LCD ¿ØÖÆÏß¹²ÓÃ P2.5~P2.7,
-     * ·ñÔòÌ½²âÆÁÄ»Ê±µÄµçÆ½Ìø±ä»á°Ñ LED ´øÁÁ */
-    LED_Init();
-
-    /* ---------- 3. ´«¸ĞÆ÷×Ô¼ì ---------- */
-#if TEMP_SENSOR_EN
-    g_hw_t_ok = DS18B20_Check();
-    DS18B20_Start();
-#else
-    g_hw_t_ok = 0;                      /* ´«¸ĞÆ÷Ó²¼ş¹ÊÕÏ, ¹¦ÄÜ¹Ø±Õ(´úÂë±£Áô) */
-#endif
     INA219_Init();
-    g_hw_ina_ok = INA219_Check();
 
-    /* ---------- 3.5 ÓÃ°åÔØ LED ±¨¸æ¿ª»ú×´Ì¬ ----------
-     * INA219 ÔÚÏß -> ÁÁ 4 ¸ñÍ£Ò»ÏÂ
-     * ²»ÔÚÏß      -> ÕûÅÅÉÁ 3 ´Î
-     */
-    if(g_hw_ina_ok)
-    {
-        LED_Bar(4);
-        Delay(800);
-        LED_Bar(0);
-    }
-    else
-    {
-        for(i = 0; i < 3; i++)
-        {
-            LED_Bar(LED_BAR_N);
-            Delay(200);
-            LED_Bar(0);
-            Delay(200);
-        }
-    }
 
-    /* ---------- 4. ¿ª»ú»­Ãæ ---------- */
-    if(g_disp == 0)
-    {
-        LCD_ShowString(1, 1, "CHARGE PROTECTOR");
-        LCD_ShowString(2, 1, "SELF TEST...");
-        Delay(1200);
-    }
+    Relay_ON();
 
-    g_page      = 2;                    /* ÏÈ¿´Ò»ÑÛ×Ô¼ì½á¹û, ÔÙ»Øµ½ÊµÊ±Ò³ */
-    g_page_hold = 5;                    /* Ô¼ 2.5 Ãë */
-    t_page      = Timer0_GetTick();
 
-    /* ---------- 5. Ö÷Ñ­»·(È«³Ì·Ç×èÈû) ---------- */
+    Matrix_Set(OK);
+
+
+
     while(1)
     {
-        now = Timer0_GetTick();
 
-        /* °´¼üÉ¨Ãè: Ã¿ 20ms Ò»´Î */
-        if((now - t_key) >= 20)
-        {
-            t_key = now;
-            Key_Update();
-        }
-        ev = Key_GetEvent();
-        if(ev)
-        {
-            if(ev & KEY_LONG_FLAG) g_kflash = 1;      /* ³¤°´±»Ê¶±ğ -> ·´À¡ÌõÉÁË¸ */
-            g_kbar = (unsigned char)(ev & 0x0F);
-            t_kbar = now;
-        }
-        Key_Handle(ev);
 
-        /* °´¼ü·´À¡: °´×¡Ê±ÁÁ¶ÔÓ¦¸ñÊı, ËÉÊÖºóÔÙ±£³Ö 1 Ãë */
-        kd = Key_GetDown();
-        if(kd)
-        {
-            unsigned char n = 1;
 
-            while((kd & 0x01) == 0) { kd >>= 1; n++; }
-            g_kbar = n;
-            t_kbar = now;
-        }
-        else if((now - t_kbar) >= 1000)
+        /*
+        1. ç‚¹é˜µæœ€é«˜ä¼˜å…ˆçº§
+        */
+
+        Matrix_Refresh();
+
+
+
+
+        /*
+        2. æŒ‰é”®æ‰«æ
+        */
+
+        KeyNum=Key();
+
+
+        if(KeyNum==1)
         {
-            g_kbar   = 0;
-            g_kflash = 0;
+            TemperatureLimit++;
         }
 
-        /* ---- ´«¸ĞÆ÷²ÉÑù ---- */
-#if TEMP_SENSOR_EN
-        if((now - t_sensor) >= 1000)
+
+        if(KeyNum==2)
         {
-            int t;
-
-            t_sensor = now;
-
-            /* ÏÈÈ¡×ßÉÏÒ»´Î×ª»»½á¹û, ÔÙÆô¶¯ÏÂÒ»´Î×ª»», È«³Ì²»ÓÃËÀµÈ */
-            if(DS18B20_ReadTemp_x10(&t))
+            if(TemperatureLimit>5)
             {
-                g_t_x10   = t;
-                g_t_ok    = 1;
-                g_hw_t_ok = 1;
-            }
-            else
-            {
-                g_t_ok    = 0;
-                g_hw_t_ok = 0;
-            }
-
-            DS18B20_Start();
-        }
-#endif /* TEMP_SENSOR_EN */
-
-        if((now - t_ina) >= 200)
-        {
-            t_ina = now;
-
-            if(INA219_ReadAll(&v, &i))
-            {
-                g_mv        = v;
-                g_ma        = i;
-                g_ina_ok    = 1;
-                g_hw_ina_ok = 1;
-            }
-            else
-            {
-                g_mv        = 0;
-                g_ma        = 0;
-                g_ina_ok    = 0;
-                g_hw_ina_ok = 0;
+                TemperatureLimit--;
             }
         }
 
-        /* INA219 µôÏßºóÃ¿ 2 ÃëÖØÊÔ³õÊ¼»¯(Ğéº¸/²åÍ·ËÉÁË¿ÉÄÜÓÖºÃ) */
-        if((!g_ina_ok) && ((now - t_reinit) >= 2000))
+
+
+
+
+        /*
+        3. å®šæ—¶ä»»åŠ¡
+        */
+
+        Count++;
+
+
+
+        if(Count>=500)
         {
-            t_reinit = now;
-            INA219_Init();
-        }
 
-        /* ±£»¤Âß¼­: Ã¿ 200ms */
-        if((now - t_ctrl) >= 200)
-        {
-            t_ctrl = now;
-            Control_Update();
-        }
+            Count=0;
 
-        /* ³äµç¼ÆÊ±: Ã¿Ãë¼ÓÒ» */
-        if((now - t_sec) >= 1000)
-        {
-            t_sec = now;
-            if(g_state == ST_CHARGING) g_sec++;
-        }
 
-        /* ÁÙÊ±Ò³Ãæ×Ô¶¯·µ»Ø */
-        if(g_page_hold > 0)
-        {
-            if((now - t_page) >= 500)
-            {
-                t_page = now;
-                g_page_hold--;
-                if(g_page_hold == 0) g_page = 0;
-            }
-        }
 
-        /* ÉÁË¸±êÖ¾ + °åÔØ LED Ë¢ĞÂ */
-        if((now - t_blink) >= 250)
-        {
-            unsigned char lvl;
+            /*
+            DS18B20
+            */
 
-            t_blink = now;
-            if(g_blink) g_blink = 0;
-            else        g_blink = 1;
+            DS18B20_ConvertT();
 
-            /* µçÁ÷Öù×´Ìõ: ÒÔ¹ıÁ÷ãĞÖµÎªÂú¸ñ, Ö±¹ÛÏÔÊ¾ INA219 ²âµ½µÄµçÁ÷ */
-            lvl = 0;
-            if(g_ma > 0)
-            {
-                lvl = (unsigned char)(((unsigned int)g_ma * 8) / g_oc);
-                if(lvl > 8) lvl = 8;
-            }
+            Delay(750);
 
-            if(g_kbar)                  /* ÕıÔÚ°´¼ü: ÓÅÏÈÏÔÊ¾°´¼ü·´À¡Ìõ */
-            {
-                if(g_kflash && g_blink) LED_Bar(0);     /* ³¤°´ÒÑ´¥·¢: ÉÁ */
-                else                    LED_Bar(g_kbar);
-            }
-            else
-            {
-                LED_Show(g_state, g_blink, lvl);
-            }
-        }
+            Temperature=DS18B20_ReadT();
 
-        /* ÏÔÊ¾Ë¢ĞÂ: Ã¿ 250ms */
-        if(g_disp == 0)
-        {
-            if((now - t_disp) >= 250)
-            {
-                t_disp = now;
-                Disp_Update();
-            }
-        }
-        else
-        {
-            Disp_Matrix();
-        }
-    }
+
+
+
+            /*
+            INA219
+            */
+
+            Current=INA219_ReadCurrent();
+
+
+
+
+            /*
+            ä¿æŠ¤åˆ¤æ–­
+
+            æ¸©åº¦è¿‡é«˜
+            æˆ–
+            ç”µæµå¼‚å¸¸
+
+            */
+
+/*
+æ¸©åº¦ä¿æŠ¤*/
+
+if(Temperature>=TemperatureLimit)
+{
+
+    Relay_OFF();
+
+    Matrix_Set(ERROR);
+
 }
+
+
+
+
+//ä¿ç•™INA219ç”µæµæ£€æµ‹
+
+if(Current!=0)
+{
+
+    Relay_ON();
+
+    Matrix_Set(OK);
+
+}
+
+else
+{
+
+    Relay_OFF();
+
+    Matrix_Set(ERROR);
+
+}}}}

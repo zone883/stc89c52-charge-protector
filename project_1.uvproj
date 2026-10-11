@@ -392,16 +392,6 @@
               <FilePath>.\Delay.h</FilePath>
             </File>
             <File>
-              <FileName>LED.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\LED.c</FilePath>
-            </File>
-            <File>
-              <FileName>LED.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>.\LED.h</FilePath>
-            </File>
-            <File>
               <FileName>Timer0.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\Timer0.c</FilePath>
@@ -480,16 +470,6 @@
               <FileName>MatrixLED.h</FileName>
               <FileType>5</FileType>
               <FilePath>.\MatrixLED.h</FilePath>
-            </File>
-            <File>
-              <FileName>LCD1602.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\LCD1602.c</FilePath>
-            </File>
-            <File>
-              <FileName>LCD1602.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>.\LCD1602.h</FilePath>
             </File>
           </Files>
         </Group>

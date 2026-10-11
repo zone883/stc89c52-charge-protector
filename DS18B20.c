@@ -1,60 +1,39 @@
 #include <REGX52.H>
 #include "OneWire.h"
-#include "DS18B20.h"
 
-/* DS18B20 Ö¸Áî */
-#define DS18B20_SKIP_ROM         0xCC
-#define DS18B20_CONVERT_T        0x44
-#define DS18B20_READ_SCRATCHPAD  0xBE
+//DS18B20æŒ‡ä»¤
+#define DS18B20_SKIP_ROM			0xCC
+#define DS18B20_CONVERT_T			0x44
+#define DS18B20_READ_SCRATCHPAD 	0xBE
 
-/* DS18B20 µÄÎïÀíÁ¿³Ì -55 ~ +125 ¡æ, ³¬³öÕâ¸ö·¶Î§ËµÃ÷¶ÁÊı²»¿ÉĞÅ */
-#define TEMP_MIN_X10  (-550)
-#define TEMP_MAX_X10  (1250)
-
-/* ´«¸ĞÆ÷ÔÚÏß¼ì²â: µ¥×ÜÏß¸´Î»ºóÆ÷¼ş»á°Ñ×ÜÏßÀ­µÍ(´æÔÚÂö³å) */
-bit DS18B20_Check(void)
+/**
+  * @brief  DS18B20å¼€å§‹æ¸©åº¦å˜æ¢
+  * @param  æ— 
+  * @retval æ— 
+  */
+void DS18B20_ConvertT(void)
 {
-    if(OneWire_Init() == 0) return 1;     /* 0 = ÓĞÆ÷¼şÓ¦´ğ */
-    return 0;
+	OneWire_Init();
+	OneWire_SendByte(DS18B20_SKIP_ROM);
+	OneWire_SendByte(DS18B20_CONVERT_T);
 }
 
-/* Æô¶¯Ò»´ÎÎÂ¶È×ª»»(²»µÈ´ı, 750ms ºóÔÙÀ´¶Á) */
-void DS18B20_Start(void)
+/**
+  * @brief  DS18B20è¯»å–æ¸©åº¦
+  * @param  æ— 
+  * @retval æ¸©åº¦æ•°å€¼
+  */
+float DS18B20_ReadT(void)
 {
-    OneWire_Init();
-    OneWire_SendByte(DS18B20_SKIP_ROM);
-    OneWire_SendByte(DS18B20_CONVERT_T);
-}
-
-/* ¶ÁÎÂ¶È: 12 Î»·Ö±æÂÊ, Ô­Ê¼ÖµÃ¿ 1 ¸ö LSB = 0.0625¡æ
- * ÕâÀïÏÈ°ÑÔ­Ê¼Öµ»»³É 0.1¡æ µ¥Î»µÄÕûÊı, ±ÜÃâÔÚµ¥Æ¬»úÀïÅÜ¸¡µãÔËËã
- * t µÄµ¥Î»ÊÇ 0.1¡æ, ÀıÈç t = 256 ±íÊ¾ 25.6¡æ */
-bit DS18B20_ReadTemp_x10(int *t)
-{
-    unsigned char TLSB, TMSB;
-    int  raw;
-    long tmp;
-
-    /* ¶ÁÖ®Ç°ÔÙÈ·ÈÏÒ»´ÎÆ÷¼ş»¹ÔÚ, °Îµô´«¸ĞÆ÷Ê±Á¢¿ÌÄÜ·¢ÏÖ */
-    if(OneWire_Init() != 0)
-        return 0;
-
-    OneWire_SendByte(DS18B20_SKIP_ROM);
-    OneWire_SendByte(DS18B20_READ_SCRATCHPAD);
-
-    TLSB = OneWire_ReceiveByte();
-    TMSB = OneWire_ReceiveByte();
-
-    /* ¸ß×Ö½ÚÔÚÇ°, Æ´³É 16 Î»ÓĞ·ûºÅÊı(µÍÎÂÊ± bit15~bit11 È« 1) */
-    raw = (int)(((unsigned int)TMSB << 8) | TLSB);
-
-    tmp = (long)raw * 10;         /* 0.0625¡æ -> 0.1¡æ */
-    tmp = tmp / 16;
-
-    /* ³¬Á¿³Ì / Æ÷¼şµôÏßÊ±µÄÂÒÂë(±ÈÈç 85¡æ ÉÏµçÄ¬ÈÏÖµÒÔÍâµÄ¹ÖÖµ)Ò»ÂÉÅĞÎŞĞ§ */
-    if((tmp <= TEMP_MIN_X10) || (tmp >= TEMP_MAX_X10))
-        return 0;
-
-    *t = (int)tmp;
-    return 1;
+	unsigned char TLSB,TMSB;
+	int Temp;
+	float T;
+	OneWire_Init();
+	OneWire_SendByte(DS18B20_SKIP_ROM);
+	OneWire_SendByte(DS18B20_READ_SCRATCHPAD);
+	TLSB=OneWire_ReceiveByte();
+	TMSB=OneWire_ReceiveByte();
+	Temp=(TMSB<<8)|TLSB;
+	T=Temp/16.0;
+	return T;
 }

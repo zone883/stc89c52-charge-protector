@@ -1,105 +1,19 @@
 #include <REGX52.H>
-#include "Key.h"
+#include "Delay.h"
 
-/* ------------------------------------------------------------------
- * °´¼üÒı½ÅÓ³Éä±í  (ÖØÒª!)
- *
- * ½­Ğ­¿Æ¼¼ / ÆÕÖĞ¿ª·¢°åÉÏ, ËÄ¸ö¶ÀÁ¢°´¼ü²¢²»ÊÇ°´ P3.0~P3.3 Ë³Ğò½ÓµÄ,
- * Êµ¼Ê½Ó·¨ÊÇ:  K1=P3.1   K2=P3.0   K3=P3.2   K4=P3.3
- * ËùÒÔÈç¹û°´ P3.0~P3.3 Ë³ĞòÈ¥¶Á, °´"K1"»áµ±³É K2, °´"K2"»áµ±³É K1¡£
- *
- * ÏÂÃæÊı×é°´¡¾Ë¿Ó¡ K1,K2,K3,K4¡¿µÄË³ĞòÌî¶ÔÓ¦µÄ P3 Òı½ÅºÅ(0~3)¡£
- *
- * »»ÁË±ğµÄ°å×ÓÔõÃ´È·¶¨Ë³Ğò: ÓÃ"°´¼ü·´À¡Ìõ"(¼û main.c)
- *   °´×¡Ë¿Ó¡ K1 ²»·Å, ¿´°åÔØ LED ÁÁ¼¸¸ñ:
- *       ÁÁ 1 ¸ñ -> Ó³ÉäÕıÈ·
- *       ÁÁ 2 ¸ñ -> K1/K2 ½Ó·´ÁË, °ÑÏÂÃæÊı×éÇ°Á½¸öÊı×Ö½»»»¼´¿É
- *   ÒÀ´ÎÊÔÍê 4 ¸ö¼ü, ¾ÍÄÜ°ÑÕâÕÅ±íÌî¶Ô¡£
- * ------------------------------------------------------------------ */
-static unsigned char code KEY_PIN_MAP[4] = { 1, 0, 2, 3 };
-
-#define KEY_COUNT       4
-#define KEY_DEBOUNCE    2       /* 2  * 10ms = 20ms Ïû¶¶ */
-#define KEY_LONG_TIME   100     /* 100 * 10ms = 1s  ÅĞ³¤°´ */
-
-static unsigned char key_down[KEY_COUNT];      /* ÒÑÈ·ÈÏ°´ÏÂ */
-static unsigned int  key_time[KEY_COUNT];      /* °´×¡Ê±³¤(10ms Îªµ¥Î») */
-static unsigned char key_long_sent[KEY_COUNT]; /* ³¤°´ÊÂ¼şÊÇ·ñÒÑ·¢¹ı */
-static unsigned char key_event = 0;
-
-/* ·µ»Ø 1 ±íÊ¾¸Ã¼ü±»°´ÏÂ (Òı½ÅµÍµçÆ½ = °´ÏÂ) */
-static unsigned char Key_ReadPin(unsigned char n)
+/**
+  * @brief  è·å–ç‹¬ç«‹æŒ‰é”®é”®ç 
+  * @param  æ— 
+  * @retval æŒ‰ä¸‹æŒ‰é”®çš„é”®ç ï¼ŒèŒƒå›´ï¼š0~4ï¼Œæ— æŒ‰é”®æŒ‰ä¸‹æ—¶è¿”å›å€¼ä¸º0
+  */
+unsigned char Key()
 {
-    unsigned char pin;
-
-    pin = KEY_PIN_MAP[n - 1];
-
-    if(P3 & (unsigned char)(1u << pin)) return 0;   /* ¸ßµçÆ½: ËÉ¿ª */
-    return 1;                                       /* µÍµçÆ½: °´ÏÂ */
-}
-
-void Key_Update(void)
-{
-    unsigned char i, n, now;
-
-    for(i = 0; i < KEY_COUNT; i++)
-    {
-        n   = (unsigned char)(i + 1);
-        now = Key_ReadPin(n);
-
-        if(now)
-        {
-            if(key_time[i] < 60000) key_time[i]++;
-
-            /* Ïû¶¶Í¨¹ı -> È·ÈÏ°´ÏÂ */
-            if((key_time[i] >= KEY_DEBOUNCE) && (!key_down[i]))
-            {
-                key_down[i]      = 1;
-                key_long_sent[i] = 0;
-            }
-
-            /* °´×¡Âú 1 Ãë -> ÉÏ±¨³¤°´ */
-            if(key_down[i] && (!key_long_sent[i]) && (key_time[i] >= KEY_LONG_TIME))
-            {
-                key_long_sent[i] = 1;
-                key_event = (unsigned char)(n | KEY_LONG_FLAG);
-            }
-        }
-        else
-        {
-            /* ËÉÊÖ: Èç¹ûÖ®Ç°Ã»·¢¹ı³¤°´, ¾ÍÉÏ±¨Ò»´Î¶Ì°´ */
-            if(key_down[i] && (!key_long_sent[i]))
-            {
-                key_event = n;
-            }
-
-            key_down[i]      = 0;
-            key_time[i]      = 0;
-            key_long_sent[i] = 0;
-        }
-    }
-}
-
-unsigned char Key_GetEvent(void)
-{
-    unsigned char e;
-
-    e = key_event;
-    key_event = 0;
-
-    return e;
-}
-
-/* µ±Ç°°´×¡µÄ°´¼üÑÚÂë: bit0~bit3 ¶ÔÓ¦ K1~K4
- * ÓÃÀ´×ö"°´¼ü·´À¡Ìõ": °´×¡ÄÄ¸ö¼ü, °åÔØ LED ¾ÍÁÁ¼¸¸ñ */
-unsigned char Key_GetDown(void)
-{
-    unsigned char i, m;
-
-    m = 0;
-    for(i = 0; i < KEY_COUNT; i++)
-    {
-        if(key_down[i]) m |= (unsigned char)(1u << i);
-    }
-    return m;
+	unsigned char KeyNumber=0;
+	
+	if(P3_0==0){Delay(20);while(P3_0==0);Delay(20);KeyNumber=1;}
+	if(P3_1==0){Delay(20);while(P3_1==0);Delay(20);KeyNumber=2;}
+	if(P3_2==0){Delay(20);while(P3_2==0);Delay(20);KeyNumber=3;}
+	if(P3_3==0){Delay(20);while(P3_3==0);Delay(20);KeyNumber=4;}
+	
+	return KeyNumber;
 }

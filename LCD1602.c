@@ -1,122 +1,223 @@
 #include <REGX52.H>
-#include "LCD1602.h"
 
-/* Òı½ÅÅäÖÃ */
-sbit LCD_RS = P2^6;
-sbit LCD_RW = P2^5;
-sbit LCD_EN = P2^7;
+//å¼•è„šé…ç½®ï¼š
+sbit LCD_RS=P2^6;
+sbit LCD_RW=P2^5;
+sbit LCD_EN=P2^7;
 #define LCD_DataPort P0
 
-/* ------------------------------------------------------------------
- * Ô¼ 150us ÑÓÊ± (11.0592MHz / 12MHz ¾§Õñ)¡£
- * HD44780 Ò»´ÎĞ´ÈëÖ»ĞèÒª 40us, ÕâÀïÁôÁË 3 ±¶ÒÔÉÏÓàÁ¿, Ğ´ÆÁËÙ¶ÈÒ²¹»¿ì¡£
- * (ÇåÆÁÃüÁîÒª 1.64ms, ËùÒÔ LCD_Init ºÍ LCD_Check ÀïÁíÍâ²¹ÁËÑÓÊ±)
- * ------------------------------------------------------------------ */
-static void LCD_Delay(void)
+//å‡½æ•°å®šä¹‰ï¼š
+/**
+  * @brief  LCD1602å»¶æ—¶å‡½æ•°ï¼Œ12MHzè°ƒç”¨å¯å»¶æ—¶1ms
+  * @param  æ— 
+  * @retval æ— 
+  */
+void LCD_Delay()
 {
-    unsigned char i;
+	unsigned char i, j;
 
-    i = 250;
-    while(i--);
+	i = 2;
+	j = 239;
+	do
+	{
+		while (--j);
+	} while (--i);
 }
 
-/* Ğ´ÃüÁî */
+/**
+  * @brief  LCD1602å†™å‘½ä»¤
+  * @param  Command è¦å†™å…¥çš„å‘½ä»¤
+  * @retval æ— 
+  */
 void LCD_WriteCommand(unsigned char Command)
 {
-    LCD_RS = 0;
-    LCD_RW = 0;
-    LCD_DataPort = Command;
-    LCD_EN = 1;
-    LCD_Delay();
-    LCD_EN = 0;
-    LCD_Delay();
+	LCD_RS=0;
+	LCD_RW=0;
+	LCD_DataPort=Command;
+	LCD_EN=1;
+	LCD_Delay();
+	LCD_EN=0;
+	LCD_Delay();
 }
 
-/* Ğ´Êı¾İ */
+/**
+  * @brief  LCD1602å†™æ•°æ®
+  * @param  Data è¦å†™å…¥çš„æ•°æ®
+  * @retval æ— 
+  */
 void LCD_WriteData(unsigned char Data)
 {
-    LCD_RS = 1;
-    LCD_RW = 0;
-    LCD_DataPort = Data;
-    LCD_EN = 1;
-    LCD_Delay();
-    LCD_EN = 0;
-    LCD_Delay();
+	LCD_RS=1;
+	LCD_RW=0;
+	LCD_DataPort=Data;
+	LCD_EN=1;
+	LCD_Delay();
+	LCD_EN=0;
+	LCD_Delay();
 }
 
-/* ¶Á»ØµØÖ·¼ÆÊıÆ÷(Ë³±ã°ÑÃ¦±êÖ¾¶Á»ØÀ´) */
-static unsigned char LCD_ReadStatus(void)
+/**
+  * @brief  LCD1602è®¾ç½®å…‰æ ‡ä½ç½®
+  * @param  Line è¡Œä½ç½®ï¼ŒèŒƒå›´ï¼š1~2
+  * @param  Column åˆ—ä½ç½®ï¼ŒèŒƒå›´ï¼š1~16
+  * @retval æ— 
+  */
+void LCD_SetCursor(unsigned char Line,unsigned char Column)
 {
-    unsigned char st;
-
-    LCD_DataPort = 0xFF;        /* P0 ÊÍ·Å, ¿¿ÉÏÀ­µç×è±£³Ö¸ßµçÆ½ */
-    LCD_RS = 0;
-    LCD_RW = 1;
-    LCD_EN = 1;
-    LCD_Delay();
-    st = LCD_DataPort;
-    LCD_EN = 0;
-    LCD_RW = 0;
-    LCD_Delay();
-
-    return st;
+	if(Line==1)
+	{
+		LCD_WriteCommand(0x80|(Column-1));
+	}
+	else if(Line==2)
+	{
+		LCD_WriteCommand(0x80|(Column-1+0x40));
+	}
 }
 
-/* ------------------------------------------------------------------
- * Ì½²â LCD µ½µ×½ÓÃ»½ÓÉÏ:
- * ·¢Ò»ÌõÇåÆÁÃüÁîºó¶Á»ØµØÖ·¼ÆÊıÆ÷, Õı³£Ó¦¶Áµ½ 0x80 (Ã¦±êÖ¾ 0 + AC = 0);
- * ÆÁÄ»Ã»²åºÃÊ± P0 ±»ÉÏÀ­µç×èÀ­³É 0xFF, ÓÉ´ËÅĞ¶Ï"ÆÁ²»ÔÚ"¡£
- * ÕâÑù¼´Ê¹ LCD ½ÓÏßÓĞÎÊÌâ, ³ÌĞòÒ²ÄÜ×Ô¶¯¸ÄÓÃµãÕóÏÔÊ¾, ²»»áÒ»Æ¬¿Õ°×¡£
- * ------------------------------------------------------------------ */
-bit LCD_Check(void)
+/**
+  * @brief  LCD1602åˆå§‹åŒ–å‡½æ•°
+  * @param  æ— 
+  * @retval æ— 
+  */
+void LCD_Init()
 {
-    unsigned int i;
-
-    LCD_WriteCommand(0x01);         /* ÇåÆÁ */
-    for(i = 0; i < 40; i++)         /* ÇåÆÁÒª 1.64ms, ÕâÀïµÈµ½Î» */
-    {
-        LCD_Delay();
-    }
-
-    if(LCD_ReadStatus() == 0x80) return 1;
-    return 0;
+	LCD_WriteCommand(0x38);//å…«ä½æ•°æ®æ¥å£ï¼Œä¸¤è¡Œæ˜¾ç¤ºï¼Œ5*7ç‚¹é˜µ
+	LCD_WriteCommand(0x0c);//æ˜¾ç¤ºå¼€ï¼Œå…‰æ ‡å…³ï¼Œé—ªçƒå…³
+	LCD_WriteCommand(0x06);//æ•°æ®è¯»å†™æ“ä½œåï¼Œå…‰æ ‡è‡ªåŠ¨åŠ ä¸€ï¼Œç”»é¢ä¸åŠ¨
+	LCD_WriteCommand(0x01);//å…‰æ ‡å¤ä½ï¼Œæ¸…å±
 }
 
-/* ÉèÖÃ¹â±êÎ»ÖÃ: Line 1~2, Column 1~16 */
-void LCD_SetCursor(unsigned char Line, unsigned char Column)
+/**
+  * @brief  åœ¨LCD1602æŒ‡å®šä½ç½®ä¸Šæ˜¾ç¤ºä¸€ä¸ªå­—ç¬¦
+  * @param  Line è¡Œä½ç½®ï¼ŒèŒƒå›´ï¼š1~2
+  * @param  Column åˆ—ä½ç½®ï¼ŒèŒƒå›´ï¼š1~16
+  * @param  Char è¦æ˜¾ç¤ºçš„å­—ç¬¦
+  * @retval æ— 
+  */
+void LCD_ShowChar(unsigned char Line,unsigned char Column,char Char)
 {
-    if(Line == 1)
-    {
-        LCD_WriteCommand(0x80 | (Column - 1));
-    }
-    else
-    {
-        LCD_WriteCommand(0x80 | (Column - 1 + 0x40));
-    }
+	LCD_SetCursor(Line,Column);
+	LCD_WriteData(Char);
 }
 
-/* ³õÊ¼»¯: °ËÎ»Êı¾İ½Ó¿Ú, Á½ĞĞÏÔÊ¾, 5x7 µãÕó */
-void LCD_Init(void)
+/**
+  * @brief  åœ¨LCD1602æŒ‡å®šä½ç½®å¼€å§‹æ˜¾ç¤ºæ‰€ç»™å­—ç¬¦ä¸²
+  * @param  Line èµ·å§‹è¡Œä½ç½®ï¼ŒèŒƒå›´ï¼š1~2
+  * @param  Column èµ·å§‹åˆ—ä½ç½®ï¼ŒèŒƒå›´ï¼š1~16
+  * @param  String è¦æ˜¾ç¤ºçš„å­—ç¬¦ä¸²
+  * @retval æ— 
+  */
+void LCD_ShowString(unsigned char Line,unsigned char Column,char *String)
 {
-    unsigned int i;
-
-    LCD_WriteCommand(0x38);
-    LCD_WriteCommand(0x0C);         /* ÏÔÊ¾¿ª, ¹â±ê¹Ø */
-    LCD_WriteCommand(0x06);         /* Ğ´ÈëºóµØÖ·×Ô¶¯¼ÓÒ» */
-    LCD_WriteCommand(0x01);         /* ÇåÆÁ */
-    for(i = 0; i < 40; i++)
-    {
-        LCD_Delay();
-    }
+	unsigned char i;
+	LCD_SetCursor(Line,Column);
+	for(i=0;String[i]!='\0';i++)
+	{
+		LCD_WriteData(String[i]);
+	}
 }
 
-void LCD_ShowString(unsigned char Line, unsigned char Column, char *String)
+/**
+  * @brief  è¿”å›å€¼=Xçš„Yæ¬¡æ–¹
+  */
+int LCD_Pow(int X,int Y)
 {
-    unsigned char i;
+	unsigned char i;
+	int Result=1;
+	for(i=0;i<Y;i++)
+	{
+		Result*=X;
+	}
+	return Result;
+}
 
-    LCD_SetCursor(Line, Column);
-    for(i = 0; String[i] != '\0'; i++)
-    {
-        LCD_WriteData(String[i]);
-    }
+/**
+  * @brief  åœ¨LCD1602æŒ‡å®šä½ç½®å¼€å§‹æ˜¾ç¤ºæ‰€ç»™æ•°å­—
+  * @param  Line èµ·å§‹è¡Œä½ç½®ï¼ŒèŒƒå›´ï¼š1~2
+  * @param  Column èµ·å§‹åˆ—ä½ç½®ï¼ŒèŒƒå›´ï¼š1~16
+  * @param  Number è¦æ˜¾ç¤ºçš„æ•°å­—ï¼ŒèŒƒå›´ï¼š0~65535
+  * @param  Length è¦æ˜¾ç¤ºæ•°å­—çš„é•¿åº¦ï¼ŒèŒƒå›´ï¼š1~5
+  * @retval æ— 
+  */
+void LCD_ShowNum(unsigned char Line,unsigned char Column,unsigned int Number,unsigned char Length)
+{
+	unsigned char i;
+	LCD_SetCursor(Line,Column);
+	for(i=Length;i>0;i--)
+	{
+		LCD_WriteData(Number/LCD_Pow(10,i-1)%10+'0');
+	}
+}
+
+/**
+  * @brief  åœ¨LCD1602æŒ‡å®šä½ç½®å¼€å§‹ä»¥æœ‰ç¬¦å·åè¿›åˆ¶æ˜¾ç¤ºæ‰€ç»™æ•°å­—
+  * @param  Line èµ·å§‹è¡Œä½ç½®ï¼ŒèŒƒå›´ï¼š1~2
+  * @param  Column èµ·å§‹åˆ—ä½ç½®ï¼ŒèŒƒå›´ï¼š1~16
+  * @param  Number è¦æ˜¾ç¤ºçš„æ•°å­—ï¼ŒèŒƒå›´ï¼š-32768~32767
+  * @param  Length è¦æ˜¾ç¤ºæ•°å­—çš„é•¿åº¦ï¼ŒèŒƒå›´ï¼š1~5
+  * @retval æ— 
+  */
+void LCD_ShowSignedNum(unsigned char Line,unsigned char Column,int Number,unsigned char Length)
+{
+	unsigned char i;
+	unsigned int Number1;
+	LCD_SetCursor(Line,Column);
+	if(Number>=0)
+	{
+		LCD_WriteData('+');
+		Number1=Number;
+	}
+	else
+	{
+		LCD_WriteData('-');
+		Number1=-Number;
+	}
+	for(i=Length;i>0;i--)
+	{
+		LCD_WriteData(Number1/LCD_Pow(10,i-1)%10+'0');
+	}
+}
+
+/**
+  * @brief  åœ¨LCD1602æŒ‡å®šä½ç½®å¼€å§‹ä»¥åå…­è¿›åˆ¶æ˜¾ç¤ºæ‰€ç»™æ•°å­—
+  * @param  Line èµ·å§‹è¡Œä½ç½®ï¼ŒèŒƒå›´ï¼š1~2
+  * @param  Column èµ·å§‹åˆ—ä½ç½®ï¼ŒèŒƒå›´ï¼š1~16
+  * @param  Number è¦æ˜¾ç¤ºçš„æ•°å­—ï¼ŒèŒƒå›´ï¼š0~0xFFFF
+  * @param  Length è¦æ˜¾ç¤ºæ•°å­—çš„é•¿åº¦ï¼ŒèŒƒå›´ï¼š1~4
+  * @retval æ— 
+  */
+void LCD_ShowHexNum(unsigned char Line,unsigned char Column,unsigned int Number,unsigned char Length)
+{
+	unsigned char i,SingleNumber;
+	LCD_SetCursor(Line,Column);
+	for(i=Length;i>0;i--)
+	{
+		SingleNumber=Number/LCD_Pow(16,i-1)%16;
+		if(SingleNumber<10)
+		{
+			LCD_WriteData(SingleNumber+'0');
+		}
+		else
+		{
+			LCD_WriteData(SingleNumber-10+'A');
+		}
+	}
+}
+
+/**
+  * @brief  åœ¨LCD1602æŒ‡å®šä½ç½®å¼€å§‹ä»¥äºŒè¿›åˆ¶æ˜¾ç¤ºæ‰€ç»™æ•°å­—
+  * @param  Line èµ·å§‹è¡Œä½ç½®ï¼ŒèŒƒå›´ï¼š1~2
+  * @param  Column èµ·å§‹åˆ—ä½ç½®ï¼ŒèŒƒå›´ï¼š1~16
+  * @param  Number è¦æ˜¾ç¤ºçš„æ•°å­—ï¼ŒèŒƒå›´ï¼š0~1111 1111 1111 1111
+  * @param  Length è¦æ˜¾ç¤ºæ•°å­—çš„é•¿åº¦ï¼ŒèŒƒå›´ï¼š1~16
+  * @retval æ— 
+  */
+void LCD_ShowBinNum(unsigned char Line,unsigned char Column,unsigned int Number,unsigned char Length)
+{
+	unsigned char i;
+	LCD_SetCursor(Line,Column);
+	for(i=Length;i>0;i--)
+	{
+		LCD_WriteData(Number/LCD_Pow(2,i-1)%2+'0');
+	}
 }

@@ -1,13 +1,13 @@
 #ifndef __LCD1602_H__
 #define __LCD1602_H__
 
-#include <REGX52.H>
-
-/* LCD1602: RS=P2.6  RW=P2.5  EN=P2.7  D0~D7=P0 */
-void LCD_Init(void);
-bit  LCD_Check(void);      /* ¿ª»úÌ½²âÆÁÄ»½ÓÃ»½ÓÉÏ: 1 = ÓÐÓ¦´ð */
-
-void LCD_ShowString(unsigned char Line, unsigned char Column, char *String);
-void LCD_SetCursor(unsigned char Line, unsigned char Column);
+//ç”¨æˆ·è°ƒç”¨å‡½æ•°ï¼š
+void LCD_Init();
+void LCD_ShowChar(unsigned char Line,unsigned char Column,char Char);
+void LCD_ShowString(unsigned char Line,unsigned char Column,char *String);
+void LCD_ShowNum(unsigned char Line,unsigned char Column,unsigned int Number,unsigned char Length);
+void LCD_ShowSignedNum(unsigned char Line,unsigned char Column,int Number,unsigned char Length);
+void LCD_ShowHexNum(unsigned char Line,unsigned char Column,unsigned int Number,unsigned char Length);
+void LCD_ShowBinNum(unsigned char Line,unsigned char Column,unsigned int Number,unsigned char Length);
 
 #endif

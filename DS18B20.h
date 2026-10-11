@@ -1,13 +1,7 @@
 #ifndef __DS18B20_H__
 #define __DS18B20_H__
 
-#include <REGX52.H>
-
-/* ------------------------------------------------------------------
- * DS18B20 温度传感器 (单总线, DQ 接 P3.7, 见 OneWire.c)
- * ------------------------------------------------------------------ */
-bit  DS18B20_Check(void);                 /* 1 = 传感器在线(有存在脉冲) */
-void DS18B20_Start(void);                 /* 启动一次温度转换(约 750ms 后出结果) */
-bit  DS18B20_ReadTemp_x10(int *t);        /* 读上次转换结果, 单位 0.1℃, 返回 1 = 数据有效 */
+void DS18B20_ConvertT(void);
+float DS18B20_ReadT(void);
 
 #endif

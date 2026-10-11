@@ -1,134 +1,174 @@
 #include "I2C.h"
 #include "INA219.h"
 
-#define INA219_ADDRESS      0x40
-#define INA219_CURRENT_DIV  10      /* Current_LSB = 0.1mA, »»³É mA Òª³ýÒÔ 10 */
 
-/* Æ÷¼þÊÇ·ñÔÚÏßµÄ±êÖ¾ */
-static bit ina_ok = 0;
+#define INA219_ADDRESS 0x40
 
-/* Ð´ 16 Î»¼Ä´æÆ÷ */
-static void INA219_WriteReg(unsigned char Reg, unsigned int Data)
+
+
+//å†™å¯„å­˜å™¨
+void INA219_WriteReg(unsigned char Reg, unsigned int Data)
 {
     I2C_Start();
-    I2C_SendByte((unsigned char)(INA219_ADDRESS << 1));
+
+    I2C_SendByte(INA219_ADDRESS << 1);
+
     I2C_SendByte(Reg);
-    I2C_SendByte((unsigned char)(Data >> 8));
-    I2C_SendByte((unsigned char)(Data & 0xFF));
+
+    I2C_SendByte(Data >> 8);
+
+    I2C_SendByte(Data & 0xFF);
+
     I2C_Stop();
 }
 
-/* ¶Á 16 Î»¼Ä´æÆ÷ */
-static unsigned int INA219_ReadReg(unsigned char Reg)
+
+
+//è¯»å¯„å­˜å™¨
+unsigned int INA219_ReadReg(unsigned char Reg)
 {
     unsigned int Data;
 
+
     I2C_Start();
-    I2C_SendByte((unsigned char)(INA219_ADDRESS << 1));
+
+    I2C_SendByte(INA219_ADDRESS << 1);
+
     I2C_SendByte(Reg);
 
-    I2C_Start();                                    /* ÖØ¸´ÆðÊ¼Ìõ¼þ */
-    I2C_SendByte((unsigned char)((INA219_ADDRESS << 1) | 0x01));
 
-    Data  = I2C_ReceiveByte();
+
+    I2C_Start();
+
+    I2C_SendByte((INA219_ADDRESS << 1) | 1);
+
+
+
+    Data = I2C_ReceiveByte();
+
     Data <<= 8;
-    I2C_SendAck(0);                                 /* ACK: ¼ÌÐø¶ÁµÚ¶þ×Ö½Ú */
+
+
+    //ç»§ç»­æŽ¥æ”¶ç¬¬äºŒå­—èŠ‚
+    I2C_SendAck(0);
+
+
     Data |= I2C_ReceiveByte();
-    I2C_SendAck(1);                                 /* NACK: ¶ÁÍêÁË */
+
+
+    //ç»“æŸè¯»å–
+    I2C_SendAck(1);
+
 
     I2C_Stop();
+
 
     return Data;
 }
 
-/* Ì½²âÆ÷¼þ: ·¢µØÖ·¿´ÓÐÃ»ÓÐ ACK */
+
+
+
+
+//æ£€æµ‹INA219æ˜¯å¦å­˜åœ¨
 bit INA219_Check(void)
 {
-    bit ack;
+    bit Ack;
+
 
     I2C_Start();
-    ack = I2C_SendByte((unsigned char)(INA219_ADDRESS << 1));
+
+
+    Ack = I2C_SendByte(INA219_ADDRESS << 1);
+
+
     I2C_Stop();
 
-    if(ack) return 1;
-    return 0;
+
+    return Ack;
 }
+
+
+
+
+
+
+//åˆå§‹åŒ–INA219
 
 void INA219_Init(void)
 {
-    unsigned int cfg;
 
-    I2C_BusRecover();                   /* ÏÈ¾ÈÒ»ÏÂ¿ÉÄÜ±»À­ËÀµÄ×ÜÏß */
+    /*
+    
+    é…ç½®å¯„å­˜å™¨0x00
 
-    ina_ok = INA219_Check();
-    if(!ina_ok)
-        return;
+    0x399F:
 
-    /* ÅäÖÃ¼Ä´æÆ÷ 0x00 = 0x399F
-     *   bit13 BRNG = 0    -> ×ÜÏßµçÑ¹Á¿³Ì 16V
-     *   bit12~11 PG = 11  -> ·ÖÁ÷µçÑ¹ ¡À320mV
-     *   ADC 12 Î», ²ÉÑù 128 ´ÎÈ¡Æ½¾ù
-     *   MODE = 111        -> µçÑ¹µçÁ÷Á¬Ðø×ª»» */
-    INA219_WriteReg(0x00, 0x399F);
+    - 32Væµ‹é‡èŒƒå›´
+    - Â±320mVåˆ†æµèŒƒå›´
+    - è¿žç»­è½¬æ¢
+    
+    */
 
-    /* Ð£×¼¼Ä´æÆ÷ 0x05 = 4096, ¶ÔÓ¦ 0.1mA/LSB (·ÖÁ÷µç×è 0.1¦¸) */
-    INA219_WriteReg(0x05, 4096);
+    INA219_WriteReg(0x00,0x399F);
 
-    /* »Ø¶ÁÅäÖÃ¼Ä´æÆ÷ÑéÖ¤Ò»´Î, Ð´²»½øÈ¥ËµÃ÷ I2C »¹ÊÇ²»Í¨ */
-    cfg = INA219_ReadReg(0x00);
-    if(cfg != 0x399F)
-    {
-        ina_ok = 0;
-    }
+
+
+    /*
+    
+    æ ¡å‡†å¯„å­˜å™¨
+
+    Current_LSB = 0.1mA
+
+    */
+
+    INA219_WriteReg(0x05,4096);
+
 }
 
-/* ×ÜÏßµçÑ¹, µ¥Î» mV: ¼Ä´æÆ÷ bit15~bit3, ×îÐ¡¿Ì¶È 4mV */
+
+
+
+
+//è¯»å–æ€»çº¿ç”µåŽ‹
+
+//è¿”å›žå•ä½ mV
+
 unsigned int INA219_ReadBusVoltage(void)
 {
+
     unsigned int Data;
 
+
     Data = INA219_ReadReg(0x02);
+
+
+    //å³ç§»3ä½ï¼Œå†ä¹˜4
+
     Data = (Data >> 3) * 4;
 
+
     return Data;
+
 }
 
-/* µçÁ÷, µ¥Î» mA: µçÁ÷¼Ä´æÆ÷Ô­Ê¼Öµ * 0.1mA = Ô­Ê¼Öµ/10 */
+
+
+
+
+//è¯»å–ç”µæµ
+
+//è¿”å›žå•ä½ mA
+
 int INA219_ReadCurrent(void)
 {
+
     int Data;
 
+
     Data = (int)INA219_ReadReg(0x04);
-    Data = Data / INA219_CURRENT_DIV;
 
-    return Data;
-}
 
-/* Ò»´Î¶ÁÍêµçÑ¹+µçÁ÷, ²¢Ë³ÊÖÅÐ¶ÏÆ÷¼þÊÇ²»ÊÇ¶Á×Å¶Á×ÅµôÏßÁË */
-bit INA219_ReadAll(unsigned int *mV, int *mA)
-{
-    unsigned int v;
+    return Data ;
 
-    *mV = 0;
-    *mA = 0;
-
-    if(!ina_ok)
-        return 0;
-
-    v = INA219_ReadBusVoltage();
-
-    /* È«ÊÇ 1 ËµÃ÷×ÜÏßÉÏ¸ù±¾Ã»ÈËÓ¦´ð(SDA ±»ÉÏÀ­µç×èÀ­¸ß), ÊÓÎªµôÏß */
-    if(v >= 32000)
-    {
-        if(!INA219_Check())
-        {
-            ina_ok = 0;
-            return 0;
-        }
-    }
-
-    *mV = v;
-    *mA = INA219_ReadCurrent();
-
-    return 1;
 }
