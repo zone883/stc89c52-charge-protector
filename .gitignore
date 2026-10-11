@@ -1,0 +1,28 @@
+# ---- Keil / C51 中间产物（编译生成，不入库）----
+*.obj
+*.lst
+*.LST
+*.m51
+*.plg
+*.sbr
+*.bak
+*.$$$
+*.uvgui.*
+*.uvopt
+*.build_log.htm
+Listings/
+build_*.txt
+
+# Objects 目录只保留可直接烧录的固件
+Objects/*
+!Objects/project_1.hex
+
+# ---- 操作系统 ----
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- 编辑器 / IDE ----
+.vscode/
+.idea/
+*.swp
